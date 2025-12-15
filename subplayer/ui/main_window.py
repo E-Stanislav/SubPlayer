@@ -1,4 +1,5 @@
 """Главное окно приложения"""
+from typing import Optional
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QFileDialog, QLabel, QSlider, QProgressBar, QStackedWidget
@@ -168,7 +169,7 @@ class MainWindow(QMainWindow):
         try:
             widget_id = self.mpv_widget.get_widget_id()
             
-            # Создаём плеер с правильным wid
+            # Создаём плеер с правильным wid (инициализация отложена)
             self.mpv_player = MPVPlayer(self, widget_id=widget_id)
             
             # Подключаем сигналы
@@ -178,6 +179,8 @@ class MainWindow(QMainWindow):
             self.mpv_player.error_occurred.connect(self._on_player_error)
         except Exception as e:
             self.statusBar().showMessage(f"Ошибка настройки mpv: {str(e)}")
+            # Если mpv не работает, продолжаем без него
+            self.mpv_player = None
     
     def _on_position_changed(self, position: float):
         """Обработка изменения позиции"""

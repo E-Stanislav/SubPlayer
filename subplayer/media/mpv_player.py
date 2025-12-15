@@ -20,25 +20,6 @@ class MPVPlayer(QObject):
         
         self._widget_id = widget_id or int(os.environ.get('QT_WIDGET_ID', 0))
         self._player = None
-        self._initialize_player()
-        
-        # Обработчики событий mpv
-        @self._player.property_observer('time-pos')
-        def time_observer(_name, value):
-            if value is not None:
-                self.position_changed.emit(float(value))
-        
-        @self._player.property_observer('duration')
-        def duration_observer(_name, value):
-            if value is not None:
-                self.duration_changed.emit(float(value))
-        
-        @self._player.property_observer('pause')
-        def pause_observer(_name, value):
-            if value:
-                self.state_changed.emit('paused')
-            else:
-                self.state_changed.emit('playing')
         
         # Таймер для обновления позиции (fallback)
         self._update_timer = QTimer(self)
@@ -49,9 +30,15 @@ class MPVPlayer(QObject):
         self._current_position = 0.0
         self._current_duration = 0.0
         self._is_playing = False
+        
+        # Инициализация плеера отложена до первого использования
+        # чтобы избежать проблем при создании виджета
     
-    def _initialize_player(self):
-        """Инициализация mpv плеера"""
+    def _ensure_player_initialized(self):
+        """Убедиться, что плеер инициализирован"""
+        if self._player is not None:
+            return
+        
         try:
             # Создание mpv плеера
             # Используем wid для встраивания в Qt виджет
@@ -92,6 +79,7 @@ class MPVPlayer(QObject):
     def load_file(self, file_path: str):
         """Загрузить медиа файл"""
         try:
+            self._ensure_player_initialized()
             path = Path(file_path)
             if not path.exists():
                 self.error_occurred.emit(f"Файл не найден: {file_path}")
@@ -109,6 +97,7 @@ class MPVPlayer(QObject):
     def play(self):
         """Начать воспроизведение"""
         try:
+            self._ensure_player_initialized()
             self._player.pause = False
             self._is_playing = True
             self._update_timer.start()
@@ -118,6 +107,7 @@ class MPVPlayer(QObject):
     def pause(self):
         """Приостановить воспроизведение"""
         try:
+            self._ensure_player_initialized()
             self._player.pause = True
             self._is_playing = False
         except Exception as e:
@@ -133,6 +123,8 @@ class MPVPlayer(QObject):
     def seek(self, position: float):
         """Перемотать на позицию (в секундах)"""
         try:
+            if self._player is None:
+                return
             self._player.seek(position, reference='absolute')
             self._current_position = position
         except Exception as e:
@@ -141,6 +133,8 @@ class MPVPlayer(QObject):
     def seek_relative(self, offset: float):
         """Перемотать относительно текущей позиции (в секундах)"""
         try:
+            if self._player is None:
+                return
             self._player.seek(offset, reference='relative')
         except Exception as e:
             self.error_occurred.emit(f"Ошибка перемотки: {str(e)}")
@@ -148,6 +142,8 @@ class MPVPlayer(QObject):
     def get_position(self) -> float:
         """Получить текущую позицию (в секундах)"""
         try:
+            if self._player is None:
+                return self._current_position
             pos = self._player.time_pos
             if pos is not None:
                 self._current_position = float(pos)
@@ -158,6 +154,8 @@ class MPVPlayer(QObject):
     def get_duration(self) -> float:
         """Получить длительность (в секундах)"""
         try:
+            if self._player is None:
+                return self._current_duration
             dur = self._player.duration
             if dur is not None:
                 self._current_duration = float(dur)
@@ -168,6 +166,8 @@ class MPVPlayer(QObject):
     def is_playing(self) -> bool:
         """Проверить, играет ли плеер"""
         try:
+            if self._player is None:
+                return self._is_playing
             return not self._player.pause
         except:
             return self._is_playing
@@ -175,6 +175,7 @@ class MPVPlayer(QObject):
     def add_subtitle_file(self, subtitle_path: str):
         """Добавить файл субтитров"""
         try:
+            self._ensure_player_initialized()
             path = Path(subtitle_path)
             if not path.exists():
                 self.error_occurred.emit(f"Файл субтитров не найден: {subtitle_path}")
@@ -190,6 +191,8 @@ class MPVPlayer(QObject):
     def remove_subtitle_file(self, subtitle_path: str):
         """Удалить файл субтитров"""
         try:
+            if self._player is None:
+                return False
             # Получаем список загруженных субтитров
             sub_count = self._player.sub_count
             for i in range(sub_count):
@@ -205,6 +208,8 @@ class MPVPlayer(QObject):
     def set_subtitle_visibility(self, visible: bool):
         """Показать/скрыть субтитры"""
         try:
+            if self._player is None:
+                return
             self._player.sub_visibility = visible
         except Exception as e:
             self.error_occurred.emit(f"Ошибка изменения видимости субтитров: {str(e)}")
@@ -225,7 +230,8 @@ class MPVPlayer(QObject):
                     self._player.terminate()
                 except:
                     pass
-            self._initialize_player()
+                self._player = None
+            # Плеер будет инициализирован при первом использовании
     
     def _update_position(self):
         """Обновить позицию (fallback)"""
@@ -235,7 +241,8 @@ class MPVPlayer(QObject):
     def stop(self):
         """Остановить воспроизведение"""
         try:
-            self._player.stop()
+            if self._player is not None:
+                self._player.stop()
             self._is_playing = False
             self._update_timer.stop()
             self._current_position = 0.0
@@ -246,8 +253,12 @@ class MPVPlayer(QObject):
         """Очистка ресурсов"""
         try:
             self._update_timer.stop()
-            if hasattr(self, '_player'):
-                self._player.terminate()
+            if self._player is not None:
+                try:
+                    self._player.terminate()
+                except:
+                    pass
+                self._player = None
         except:
             pass
 
