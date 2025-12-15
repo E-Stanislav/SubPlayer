@@ -10,5 +10,9 @@ fi
 
 # Активация виртуального окружения и запуск
 source venv/bin/activate
+
+# Подавление предупреждений о конфликте libavdevice (не критично)
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+
 python -m subplayer.app
 
