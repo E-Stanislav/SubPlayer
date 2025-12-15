@@ -2,7 +2,7 @@
   "name": "subplayer",
   "version": "1.0.0",
   "description": "Простой кросс-платформенный медиа-плеер",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
@@ -33,7 +33,9 @@
       "output": "dist"
     },
     "files": [
-      "**/*",
+      "src/**/*",
+      "package.json",
+      "package-lock.json",
       "!node_modules/**/*",
       "!dist/**/*",
       "!.git/**/*",

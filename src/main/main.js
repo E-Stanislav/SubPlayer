@@ -18,7 +18,7 @@ function createWindow() {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   // Открываем DevTools в режиме разработки (можно удалить в продакшене)
   if (process.env.NODE_ENV === 'development') {
