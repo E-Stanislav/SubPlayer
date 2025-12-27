@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+python/venv/
+python/__pycache__/
+python/models/
+
+# Build outputs
+dist/
+dist-electron/
+release/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+
