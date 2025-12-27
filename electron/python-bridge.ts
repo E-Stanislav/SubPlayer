@@ -17,6 +17,10 @@ interface ProgressCallback {
   (update: { stage: string; progress: number; message: string }): void
 }
 
+interface SubtitleCallback {
+  (subtitle: Subtitle): void
+}
+
 export class PythonBridge {
   private pythonPath: string
   private pythonExecutable: string
@@ -28,37 +32,41 @@ export class PythonBridge {
   }
 
   private findPythonExecutable(): string {
-    // First, check for venv in python directory
+    // First, check for venv in python directory (dev mode)
     const venvPython = join(this.pythonPath, 'venv', 'bin', 'python')
     if (existsSync(venvPython)) {
       return venvPython
     }
 
-    // Check for common Python paths
+    // Check for venv in workspace root (when running from source)
+    const workspaceVenv = join(this.pythonPath, '..', 'python', 'venv', 'bin', 'python')
+    if (existsSync(workspaceVenv)) {
+      return workspaceVenv
+    }
+
+    // Check for common Python paths (production mode - uses system Python)
     const candidates = [
+      '/opt/homebrew/bin/python3',  // Homebrew on Apple Silicon
+      '/usr/local/bin/python3',      // Homebrew on Intel
+      '/usr/bin/python3',            // System Python
       'python3',
-      'python',
-      '/usr/bin/python3',
-      '/usr/local/bin/python3',
-      '/opt/homebrew/bin/python3'
+      'python'
     ]
 
     for (const candidate of candidates) {
-      try {
-        const result = spawn(candidate, ['--version'], { stdio: 'pipe' })
-        if (result.pid) {
-          result.kill()
-          return candidate
-        }
-      } catch {
-        continue
+      if (existsSync(candidate) || candidate === 'python3' || candidate === 'python') {
+        return candidate
       }
     }
 
     return 'python3' // Default fallback
   }
 
-  async processVideo(videoPath: string, onProgress: ProgressCallback): Promise<Subtitle[]> {
+  async processVideo(
+    videoPath: string, 
+    onProgress: ProgressCallback,
+    onSubtitle?: SubtitleCallback
+  ): Promise<Subtitle[]> {
     const scriptPath = join(this.pythonPath, 'process.py')
     
     // Check if script exists
@@ -77,20 +85,34 @@ export class PythonBridge {
 
       let outputBuffer = ''
       let errorBuffer = ''
+      const subtitles: Subtitle[] = []
 
       pythonProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString()
         outputBuffer += text
 
-        // Parse progress updates from stdout
+        // Parse messages from stdout
         const lines = text.split('\n')
         for (const line of lines) {
+          // Progress updates
           if (line.startsWith('PROGRESS:')) {
             try {
               const progressData = JSON.parse(line.substring(9))
               onProgress(progressData)
             } catch (e) {
               console.error('Failed to parse progress:', e)
+            }
+          }
+          // Streaming subtitles - send immediately to UI
+          else if (line.startsWith('SUBTITLE:')) {
+            try {
+              const subtitle = JSON.parse(line.substring(9)) as Subtitle
+              subtitles.push(subtitle)
+              if (onSubtitle) {
+                onSubtitle(subtitle)
+              }
+            } catch (e) {
+              console.error('Failed to parse subtitle:', e)
             }
           }
         }
@@ -103,17 +125,22 @@ export class PythonBridge {
 
       pythonProcess.on('close', (code: number | null) => {
         if (code === 0) {
-          // Find the JSON result in output
-          const jsonMatch = outputBuffer.match(/RESULT:(\{.*\})/s)
-          if (jsonMatch) {
-            try {
-              const result = JSON.parse(jsonMatch[1])
-              resolve(result.subtitles || [])
-            } catch (e) {
-              reject(new Error(`Failed to parse result: ${e}`))
-            }
+          // Return collected subtitles (also available from RESULT for backwards compat)
+          if (subtitles.length > 0) {
+            resolve(subtitles)
           } else {
-            reject(new Error('No result found in output'))
+            // Fallback: parse RESULT if no streaming subtitles
+            const jsonMatch = outputBuffer.match(/RESULT:(\{.*\})/s)
+            if (jsonMatch) {
+              try {
+                const result = JSON.parse(jsonMatch[1])
+                resolve(result.subtitles || [])
+              } catch (e) {
+                reject(new Error(`Failed to parse result: ${e}`))
+              }
+            } else {
+              resolve([])
+            }
           }
         } else {
           reject(new Error(`Process exited with code ${code}: ${errorBuffer}`))
@@ -126,4 +153,3 @@ export class PythonBridge {
     })
   }
 }
-

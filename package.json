@@ -39,18 +39,24 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*",
-      "python/**/*"
+      "dist-electron/**/*"
     ],
     "extraResources": [
       {
         "from": "python",
-        "to": "python"
+        "to": "python",
+        "filter": [
+          "**/*",
+          "!venv/**",
+          "!__pycache__/**",
+          "!models/**"
+        ]
       }
     ],
     "mac": {
       "category": "public.app-category.video",
-      "target": ["dmg", "zip"]
+      "target": ["dir"],
+      "identity": null
     }
   }
 }

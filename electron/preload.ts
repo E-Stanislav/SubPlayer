@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electron', {
     return ipcRenderer.invoke('open-file')
   },
 
-  // Process video (transcribe + translate)
+  // Process video (transcribe + translate) with streaming support
   processVideo: (
     videoPath: string, 
     _onProgress: (update: ProcessingUpdate) => void
@@ -38,9 +38,20 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('processing-update', handler)
   },
 
-  // Remove processing update listener
+  // Listen for streaming subtitles (real-time as they are ready)
+  onSubtitleReady: (callback: (subtitle: SubtitleResult) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, subtitle: SubtitleResult) => {
+      callback(subtitle)
+    }
+    ipcRenderer.on('subtitle-ready', handler)
+  },
+
+  // Remove all listeners
   removeProcessingListener: () => {
     ipcRenderer.removeAllListeners('processing-update')
+  },
+
+  removeSubtitleListener: () => {
+    ipcRenderer.removeAllListeners('subtitle-ready')
   }
 })
-

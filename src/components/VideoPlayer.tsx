@@ -7,9 +7,17 @@ interface VideoPlayerProps {
   src: string
   subtitles: Subtitle[]
   onReset: () => void
+  isProcessing?: boolean
+  subtitleCount?: number
 }
 
-export default function VideoPlayer({ src, subtitles, onReset }: VideoPlayerProps) {
+export default function VideoPlayer({ 
+  src, 
+  subtitles, 
+  onReset, 
+  isProcessing = false,
+  subtitleCount = 0 
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -181,6 +189,16 @@ export default function VideoPlayer({ src, subtitles, onReset }: VideoPlayerProp
         onClick={togglePlay}
       />
 
+      {/* Streaming status indicator */}
+      {isProcessing && (
+        <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-sm">
+          <div className="w-2 h-2 rounded-full bg-player-accent animate-pulse" />
+          <span className="text-xs text-white/80">
+            Обработка... {subtitleCount} субтитров
+          </span>
+        </div>
+      )}
+
       {/* Subtitles overlay */}
       <Subtitles subtitle={currentSubtitle} />
 
@@ -217,4 +235,3 @@ export default function VideoPlayer({ src, subtitles, onReset }: VideoPlayerProp
     </div>
   )
 }
-
