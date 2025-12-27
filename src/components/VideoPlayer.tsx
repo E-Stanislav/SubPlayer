@@ -37,6 +37,8 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true)
   const [currentSubtitle, setCurrentSubtitle] = useState<Subtitle | null>(null)
   const [playingTtsId, setPlayingTtsId] = useState<number | null>(null)
+  const [showSubtitles, setShowSubtitles] = useState(true)
+  const [showTranslation, setShowTranslation] = useState(true)
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null)
 
   // Find current subtitle based on video time
@@ -266,6 +268,14 @@ export default function VideoPlayer({
             onToggleTts()
           }
           break
+        case 'KeyS':
+          // Toggle all subtitles with S key
+          setShowSubtitles(prev => !prev)
+          break
+        case 'KeyR':
+          // Toggle Russian translation with R key
+          setShowTranslation(prev => !prev)
+          break
         case 'Escape':
           if (isFullscreen) {
             document.exitFullscreen()
@@ -338,7 +348,11 @@ export default function VideoPlayer({
       </div>
 
       {/* Subtitles overlay */}
-      <Subtitles subtitle={currentSubtitle} />
+      <Subtitles 
+        subtitle={currentSubtitle} 
+        showSubtitles={showSubtitles}
+        showTranslation={showTranslation}
+      />
 
       {/* Controls overlay */}
       <Controls
@@ -358,6 +372,10 @@ export default function VideoPlayer({
         ttsEnabled={ttsEnabled}
         onToggleTts={onToggleTts}
         hasTtsAudio={hasTtsAudio}
+        showSubtitles={showSubtitles}
+        showTranslation={showTranslation}
+        onToggleSubtitles={() => setShowSubtitles(prev => !prev)}
+        onToggleTranslation={() => setShowTranslation(prev => !prev)}
       />
 
       {/* Click to play overlay (when paused) */}

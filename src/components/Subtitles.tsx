@@ -2,16 +2,22 @@ import type { Subtitle } from '../App'
 
 interface SubtitlesProps {
   subtitle: Subtitle | null
+  showSubtitles?: boolean
+  showTranslation?: boolean
 }
 
-export default function Subtitles({ subtitle }: SubtitlesProps) {
-  if (!subtitle) return null
+export default function Subtitles({ 
+  subtitle, 
+  showSubtitles = true, 
+  showTranslation = true 
+}: SubtitlesProps) {
+  if (!subtitle || !showSubtitles) return null
 
   return (
     <div className="absolute bottom-24 left-0 right-0 flex justify-center px-8 pointer-events-none">
       <div className="max-w-4xl text-center animate-fade-in">
         {/* Translated text (Russian) */}
-        {subtitle.translatedText && (
+        {subtitle.translatedText && showTranslation && (
           <div className="mb-2">
             <span className="
               inline-block px-4 py-2 rounded-lg
@@ -39,4 +45,5 @@ export default function Subtitles({ subtitle }: SubtitlesProps) {
     </div>
   )
 }
+
 
