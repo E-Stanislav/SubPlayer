@@ -17,6 +17,10 @@ interface ControlsProps {
   ttsEnabled?: boolean
   onToggleTts?: () => void
   hasTtsAudio?: boolean
+  showSubtitles?: boolean
+  showTranslation?: boolean
+  onToggleSubtitles?: () => void
+  onToggleTranslation?: () => void
 }
 
 export default function Controls({
@@ -35,7 +39,11 @@ export default function Controls({
   onReset,
   ttsEnabled = false,
   onToggleTts,
-  hasTtsAudio = false
+  hasTtsAudio = false,
+  showSubtitles = true,
+  showTranslation = true,
+  onToggleSubtitles,
+  onToggleTranslation
 }: ControlsProps) {
   const progressRef = useRef<HTMLDivElement>(null)
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
@@ -231,6 +239,45 @@ export default function Controls({
 
         {/* Right controls */}
         <div className="flex items-center gap-2">
+          {/* Toggle Russian translation */}
+          {onToggleTranslation && (
+            <button
+              onClick={onToggleTranslation}
+              className={`
+                p-2 rounded-full transition-colors no-drag
+                ${showTranslation && showSubtitles
+                  ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' 
+                  : 'hover:bg-white/10 text-white/40'
+                }
+              `}
+              title={showTranslation ? 'Скрыть русские субтитры (R)' : 'Показать русские субтитры (R)'}
+              disabled={!showSubtitles}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+              </svg>
+            </button>
+          )}
+
+          {/* Toggle all subtitles */}
+          {onToggleSubtitles && (
+            <button
+              onClick={onToggleSubtitles}
+              className={`
+                p-2 rounded-full transition-colors no-drag
+                ${showSubtitles
+                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' 
+                  : 'hover:bg-white/10 text-white/40'
+                }
+              `}
+              title={showSubtitles ? 'Скрыть все субтитры (S)' : 'Показать все субтитры (S)'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+            </button>
+          )}
+
           {/* TTS Toggle */}
           {hasTtsAudio && onToggleTts && (
             <button
