@@ -24,6 +24,7 @@ function App() {
   const { 
     subtitles, 
     processingStatus, 
+    isStreaming,
     processVideo, 
     clearSubtitles 
   } = useSubtitles()
@@ -37,7 +38,7 @@ function App() {
     setVideoSrc(fileUrl)
     setVideoPath(filePath)
     
-    // Start processing
+    // Start processing (subtitles will stream in)
     await processVideo(filePath)
   }, [processVideo, clearSubtitles])
 
@@ -46,6 +47,12 @@ function App() {
     setVideoPath(null)
     clearSubtitles()
   }, [clearSubtitles])
+
+  // Show processing indicator but allow playback during streaming
+  const showProcessingOverlay = processingStatus.stage !== 'idle' && 
+                                 processingStatus.stage !== 'done' && 
+                                 processingStatus.stage !== 'error' &&
+                                 subtitles.length === 0 // Hide overlay once first subtitle arrives
 
   return (
     <div className="w-full h-full flex flex-col bg-player-bg">
@@ -64,8 +71,10 @@ function App() {
               src={videoSrc} 
               subtitles={subtitles}
               onReset={handleReset}
+              isProcessing={isStreaming}
+              subtitleCount={subtitles.length}
             />
-            {processingStatus.stage !== 'idle' && processingStatus.stage !== 'done' && (
+            {showProcessingOverlay && (
               <ProcessingOverlay status={processingStatus} />
             )}
           </>
@@ -76,4 +85,3 @@ function App() {
 }
 
 export default App
-

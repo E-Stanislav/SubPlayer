@@ -5,7 +5,9 @@ interface Window {
     openFile: () => Promise<string | null>
     processVideo: (videoPath: string, onProgress: (status: ProcessingUpdate) => void) => Promise<SubtitleResult[]>
     onProcessingUpdate: (callback: (update: ProcessingUpdate) => void) => void
+    onSubtitleReady: (callback: (subtitle: SubtitleResult) => void) => void
     removeProcessingListener: () => void
+    removeSubtitleListener: () => void
   }
 }
 
@@ -22,4 +24,3 @@ interface SubtitleResult {
   text: string
   translatedText: string
 }
-

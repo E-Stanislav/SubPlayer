@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Audio transcription using Faster Whisper.
+Audio transcription using Faster Whisper with streaming support.
 """
 
-from typing import Callable, List, Dict, Any
+from typing import Iterator, Dict, Any
 import os
 
 # Try to import faster_whisper
@@ -19,12 +19,20 @@ except ImportError:
 DEFAULT_MODEL = "base"  # Options: tiny, base, small, medium, large-v2, large-v3
 COMPUTE_TYPE = "int8"   # Use int8 for CPU, float16 for GPU
 
+# Global model cache
+_model = None
+
 
 def get_model() -> "WhisperModel":
     """
     Load and return the Whisper model.
     Model is cached after first load.
     """
+    global _model
+    
+    if _model is not None:
+        return _model
+    
     if not WHISPER_AVAILABLE:
         raise ImportError("faster-whisper is not installed")
     
@@ -37,79 +45,61 @@ def get_model() -> "WhisperModel":
         if torch.cuda.is_available():
             device = "cuda"
             compute_type = "float16"
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            # Apple Silicon - use CPU with optimizations
+            device = "cpu"
+            compute_type = "int8"
     except ImportError:
         pass
     
-    model = WhisperModel(
+    _model = WhisperModel(
         DEFAULT_MODEL,
         device=device,
         compute_type=compute_type,
         download_root=os.path.join(os.path.dirname(__file__), "models")
     )
     
-    return model
+    return _model
 
 
-def transcribe_audio(
-    audio_path: str,
-    on_progress: Callable[[float, str], None] = None
-) -> List[Dict[str, Any]]:
+def transcribe_audio_streaming(audio_path: str) -> Iterator[Dict[str, Any]]:
     """
-    Transcribe audio/video file using Faster Whisper.
+    Transcribe audio/video file using Faster Whisper with streaming output.
+    Yields segments as they become available.
     
     Args:
         audio_path: Path to audio or video file
-        on_progress: Callback for progress updates (progress%, message)
         
-    Returns:
-        List of segment dictionaries with start, end, text
+    Yields:
+        Segment dictionaries with start, end, text, progress
     """
-    
-    if on_progress:
-        on_progress(5, "Инициализация модели...")
     
     model = get_model()
     
-    if on_progress:
-        on_progress(15, "Начало распознавания речи...")
-    
-    # Transcribe with word timestamps for better accuracy
+    # Transcribe with VAD for better segmentation
     segments_generator, info = model.transcribe(
         audio_path,
         beam_size=5,
         language=None,  # Auto-detect language
-        vad_filter=True,  # Voice activity detection
+        vad_filter=True,  # Voice activity detection for streaming
         vad_parameters=dict(
-            min_silence_duration_ms=500,
-            speech_pad_ms=400
+            min_silence_duration_ms=300,  # Shorter silence = faster segments
+            speech_pad_ms=200
         )
     )
     
-    if on_progress:
-        detected_lang = info.language
-        on_progress(25, f"Обнаружен язык: {detected_lang}")
+    total_duration = info.duration if info.duration else 1
     
-    # Convert generator to list and track progress
-    segments = []
-    total_duration = info.duration if info.duration else 0
-    
+    # Yield segments as they are generated
     for segment in segments_generator:
-        segments.append({
-            "id": len(segments) + 1,
+        progress = min(95, (segment.end / total_duration) * 100) if total_duration > 0 else 50
+        
+        yield {
             "start": segment.start,
             "end": segment.end,
-            "text": segment.text.strip()
-        })
-        
-        # Calculate progress based on segment end time
-        if total_duration > 0 and on_progress:
-            progress = min(95, 25 + (segment.end / total_duration) * 70)
-            on_progress(progress, f"Обработано: {segment.end:.1f}s / {total_duration:.1f}s")
-    
-    if on_progress:
-        on_progress(100, f"Распознано {len(segments)} сегментов")
-    
-    return segments
+            "text": segment.text.strip(),
+            "progress": progress
+        }
 
 
 # For testing
@@ -120,12 +110,6 @@ if __name__ == "__main__":
         print("Usage: python transcribe.py <audio_path>")
         sys.exit(1)
     
-    def progress_callback(progress: float, message: str):
-        print(f"[{progress:.0f}%] {message}")
-    
-    result = transcribe_audio(sys.argv[1], progress_callback)
-    
-    print("\n--- Results ---")
-    for seg in result:
+    print("Starting streaming transcription...")
+    for seg in transcribe_audio_streaming(sys.argv[1]):
         print(f"[{seg['start']:.2f} - {seg['end']:.2f}] {seg['text']}")
-

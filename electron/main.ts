@@ -92,8 +92,13 @@ ipcMain.handle('process-video', async (event, videoPath: string) => {
       mainWindow?.webContents.send('processing-update', update)
     }
 
-    // Process video and get subtitles
-    const subtitles = await pythonBridge.processVideo(videoPath, onProgress)
+    // Streaming subtitle callback - send each subtitle as it's ready
+    const onSubtitle = (subtitle: { id: number; start: number; end: number; text: string; translatedText: string }) => {
+      mainWindow?.webContents.send('subtitle-ready', subtitle)
+    }
+
+    // Process video with streaming support
+    const subtitles = await pythonBridge.processVideo(videoPath, onProgress, onSubtitle)
     return subtitles
 
   } catch (error) {
@@ -106,4 +111,3 @@ ipcMain.handle('process-video', async (event, videoPath: string) => {
     throw error
   }
 })
-
