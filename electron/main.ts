@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
+import { readFileSync, existsSync } from 'fs'
 import { PythonBridge } from './python-bridge'
 
 let mainWindow: BrowserWindow | null = null
@@ -19,7 +20,7 @@ function createWindow() {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false // Allow loading local video files
+      webSecurity: false // Allow loading local video and audio files
     }
   })
 
@@ -81,7 +82,21 @@ ipcMain.handle('open-file', async () => {
   return result.filePaths[0]
 })
 
-ipcMain.handle('process-video', async (event, videoPath: string) => {
+// Read audio file and return as base64 data URL
+ipcMain.handle('read-audio-file', async (event, filePath: string): Promise<string | null> => {
+  try {
+    if (!existsSync(filePath)) {
+      return null
+    }
+    const buffer = readFileSync(filePath)
+    const base64 = buffer.toString('base64')
+    return `data:audio/wav;base64,${base64}`
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('process-video', async (event, videoPath: string, enableTts: boolean = false) => {
   if (!pythonBridge || !mainWindow) {
     throw new Error('Python bridge not initialized')
   }
@@ -93,16 +108,27 @@ ipcMain.handle('process-video', async (event, videoPath: string) => {
     }
 
     // Streaming subtitle callback - send each subtitle as it's ready
-    const onSubtitle = (subtitle: { id: number; start: number; end: number; text: string; translatedText: string }) => {
+    const onSubtitle = (subtitle: { 
+      id: number
+      start: number
+      end: number
+      text: string
+      translatedText: string
+      audioFile?: string | null
+    }) => {
       mainWindow?.webContents.send('subtitle-ready', subtitle)
     }
 
     // Process video with streaming support
-    const subtitles = await pythonBridge.processVideo(videoPath, onProgress, onSubtitle)
+    const subtitles = await pythonBridge.processVideo(
+      videoPath, 
+      onProgress, 
+      onSubtitle,
+      { enableTts }
+    )
     return subtitles
 
   } catch (error) {
-    console.error('Error processing video:', error)
     mainWindow?.webContents.send('processing-update', {
       stage: 'error',
       progress: 0,

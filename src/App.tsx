@@ -10,6 +10,7 @@ export interface Subtitle {
   end: number
   text: string
   translatedText?: string
+  audioFile?: string | null
 }
 
 export interface ProcessingStatus {
@@ -20,7 +21,8 @@ export interface ProcessingStatus {
 
 function App() {
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
-  const [videoPath, setVideoPath] = useState<string | null>(null)
+  const [enableTts, setEnableTts] = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(false) // Whether TTS is active during playback
   const { 
     subtitles, 
     processingStatus, 
@@ -29,30 +31,39 @@ function App() {
     clearSubtitles 
   } = useSubtitles()
 
-  const handleFileSelect = useCallback(async (filePath: string) => {
+  const handleFileSelect = useCallback(async (filePath: string, withTts: boolean) => {
     // Clear previous state
     clearSubtitles()
+    setEnableTts(withTts)
+    setTtsEnabled(withTts)
     
     // Create file URL for video playback
     const fileUrl = `file://${filePath}`
     setVideoSrc(fileUrl)
-    setVideoPath(filePath)
     
-    // Start processing (subtitles will stream in)
-    await processVideo(filePath)
+    // Start processing with TTS option
+    await processVideo(filePath, withTts)
   }, [processVideo, clearSubtitles])
 
   const handleReset = useCallback(() => {
     setVideoSrc(null)
-    setVideoPath(null)
+    setEnableTts(false)
+    setTtsEnabled(false)
     clearSubtitles()
   }, [clearSubtitles])
+
+  const handleToggleTts = useCallback(() => {
+    setTtsEnabled(prev => !prev)
+  }, [])
 
   // Show processing indicator but allow playback during streaming
   const showProcessingOverlay = processingStatus.stage !== 'idle' && 
                                  processingStatus.stage !== 'done' && 
                                  processingStatus.stage !== 'error' &&
-                                 subtitles.length === 0 // Hide overlay once first subtitle arrives
+                                 subtitles.length === 0
+
+  // Check if TTS audio is available
+  const hasTtsAudio = subtitles.some(s => s.audioFile)
 
   return (
     <div className="w-full h-full flex flex-col bg-player-bg">
@@ -73,6 +84,9 @@ function App() {
               onReset={handleReset}
               isProcessing={isStreaming}
               subtitleCount={subtitles.length}
+              ttsEnabled={ttsEnabled && hasTtsAudio}
+              onToggleTts={handleToggleTts}
+              hasTtsAudio={hasTtsAudio}
             />
             {showProcessingOverlay && (
               <ProcessingOverlay status={processingStatus} />

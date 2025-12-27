@@ -9,6 +9,9 @@ interface VideoPlayerProps {
   onReset: () => void
   isProcessing?: boolean
   subtitleCount?: number
+  ttsEnabled?: boolean
+  onToggleTts?: () => void
+  hasTtsAudio?: boolean
 }
 
 export default function VideoPlayer({ 
@@ -16,10 +19,15 @@ export default function VideoPlayer({
   subtitles, 
   onReset, 
   isProcessing = false,
-  subtitleCount = 0 
+  subtitleCount = 0,
+  ttsEnabled = false,
+  onToggleTts,
+  hasTtsAudio = false
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const ttsAudioRef = useRef<HTMLAudioElement>(null)
+  const [ttsAudioSrc, setTtsAudioSrc] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -28,6 +36,7 @@ export default function VideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [currentSubtitle, setCurrentSubtitle] = useState<Subtitle | null>(null)
+  const [playingTtsId, setPlayingTtsId] = useState<number | null>(null)
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null)
 
   // Find current subtitle based on video time
@@ -37,6 +46,96 @@ export default function VideoPlayer({
     )
     setCurrentSubtitle(subtitle || null)
   }, [currentTime, subtitles])
+
+  // Play TTS audio when subtitle changes (if TTS enabled)
+  useEffect(() => {
+    if (!ttsEnabled || !currentSubtitle?.audioFile) {
+      return
+    }
+
+    // Don't replay if same subtitle
+    if (playingTtsId === currentSubtitle.id) {
+      return
+    }
+
+    const subtitleId = currentSubtitle.id
+    const audioFilePath = currentSubtitle.audioFile
+
+    // Load and play TTS audio through IPC
+    const loadTts = async () => {
+      const audioDataUrl = await window.electron?.readAudioFile(audioFilePath)
+      if (!audioDataUrl) return
+      
+      setTtsAudioSrc(audioDataUrl)
+      setPlayingTtsId(subtitleId)
+    }
+
+    loadTts()
+  }, [currentSubtitle, ttsEnabled, playingTtsId])
+
+  // Handle TTS audio element events
+  useEffect(() => {
+    const audio = ttsAudioRef.current
+    if (!audio || !ttsAudioSrc) return
+
+    const handleCanPlay = () => {
+      // Lower video volume during TTS
+      if (videoRef.current) {
+        videoRef.current.volume = volume * 0.15
+      }
+      audio.play().catch(() => {
+        if (videoRef.current) {
+          videoRef.current.volume = volume
+        }
+      })
+    }
+
+    const handleEnded = () => {
+      if (videoRef.current) {
+        videoRef.current.volume = volume
+      }
+      setPlayingTtsId(null)
+      setTtsAudioSrc(null)
+    }
+
+    const handleError = () => {
+      if (videoRef.current) {
+        videoRef.current.volume = volume
+      }
+      setPlayingTtsId(null)
+      setTtsAudioSrc(null)
+    }
+
+    audio.addEventListener('canplaythrough', handleCanPlay)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('error', handleError)
+
+    return () => {
+      audio.removeEventListener('canplaythrough', handleCanPlay)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('error', handleError)
+    }
+  }, [ttsAudioSrc, volume])
+
+  // Sync TTS audio volume
+  useEffect(() => {
+    if (ttsAudioRef.current && ttsAudioSrc) {
+      ttsAudioRef.current.volume = volume
+    }
+  }, [volume, ttsAudioSrc])
+
+  // Stop TTS when disabled
+  useEffect(() => {
+    if (!ttsEnabled && ttsAudioRef.current && ttsAudioSrc) {
+      ttsAudioRef.current.pause()
+      setTtsAudioSrc(null)
+      setPlayingTtsId(null)
+      // Restore video volume
+      if (videoRef.current) {
+        videoRef.current.volume = volume
+      }
+    }
+  }, [ttsEnabled, volume, ttsAudioSrc])
 
   // Handle mouse movement for controls visibility
   const handleMouseMove = useCallback(() => {
@@ -74,7 +173,11 @@ export default function VideoPlayer({
   }, [])
 
   const handlePlay = useCallback(() => setIsPlaying(true), [])
-  const handlePause = useCallback(() => setIsPlaying(false), [])
+  const handlePause = useCallback(() => {
+    setIsPlaying(false)
+    // Pause TTS too
+    ttsAudioRef.current?.pause()
+  }, [])
 
   // Control functions
   const togglePlay = useCallback(() => {
@@ -91,22 +194,31 @@ export default function VideoPlayer({
     if (videoRef.current) {
       videoRef.current.currentTime = time
       setCurrentTime(time)
+      // Stop current TTS on seek
+      if (ttsAudioRef.current && ttsAudioSrc) {
+        ttsAudioRef.current.pause()
+        setTtsAudioSrc(null)
+        setPlayingTtsId(null)
+      }
     }
-  }, [])
+  }, [ttsAudioSrc])
 
   const handleVolumeChange = useCallback((newVolume: number) => {
     if (videoRef.current) {
-      videoRef.current.volume = newVolume
+      videoRef.current.volume = ttsEnabled && playingTtsId ? newVolume * 0.15 : newVolume
       setVolume(newVolume)
       setIsMuted(newVolume === 0)
     }
-  }, [])
+  }, [ttsEnabled, playingTtsId])
 
   const toggleMute = useCallback(() => {
     if (videoRef.current) {
       const newMuted = !isMuted
       videoRef.current.muted = newMuted
       setIsMuted(newMuted)
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.muted = newMuted
+      }
     }
   }, [isMuted])
 
@@ -148,6 +260,12 @@ export default function VideoPlayer({
         case 'KeyF':
           toggleFullscreen()
           break
+        case 'KeyT':
+          // Toggle TTS with T key
+          if (onToggleTts && hasTtsAudio) {
+            onToggleTts()
+          }
+          break
         case 'Escape':
           if (isFullscreen) {
             document.exitFullscreen()
@@ -158,7 +276,7 @@ export default function VideoPlayer({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [togglePlay, handleSeek, handleVolumeChange, toggleMute, toggleFullscreen, currentTime, duration, volume, isFullscreen])
+  }, [togglePlay, handleSeek, handleVolumeChange, toggleMute, toggleFullscreen, currentTime, duration, volume, isFullscreen, onToggleTts, hasTtsAudio])
 
   // Handle fullscreen change
   useEffect(() => {
@@ -189,15 +307,35 @@ export default function VideoPlayer({
         onClick={togglePlay}
       />
 
-      {/* Streaming status indicator */}
-      {isProcessing && (
-        <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-sm">
-          <div className="w-2 h-2 rounded-full bg-player-accent animate-pulse" />
-          <span className="text-xs text-white/80">
-            Обработка... {subtitleCount} субтитров
-          </span>
-        </div>
-      )}
+      {/* Hidden TTS audio element */}
+      <audio 
+        ref={ttsAudioRef}
+        src={ttsAudioSrc || undefined}
+        preload="auto"
+      />
+
+      {/* Status indicators */}
+      <div className="absolute top-4 right-4 flex flex-col gap-2">
+        {/* Processing indicator */}
+        {isProcessing && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-sm">
+            <div className="w-2 h-2 rounded-full bg-player-accent animate-pulse" />
+            <span className="text-xs text-white/80">
+              Обработка... {subtitleCount} субтитров
+            </span>
+          </div>
+        )}
+        
+        {/* TTS indicator */}
+        {ttsEnabled && hasTtsAudio && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/20 backdrop-blur-sm border border-orange-500/30">
+            <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            <span className="text-xs text-orange-400">Озвучка вкл</span>
+          </div>
+        )}
+      </div>
 
       {/* Subtitles overlay */}
       <Subtitles subtitle={currentSubtitle} />
@@ -217,6 +355,9 @@ export default function VideoPlayer({
         onToggleMute={toggleMute}
         onToggleFullscreen={toggleFullscreen}
         onReset={onReset}
+        ttsEnabled={ttsEnabled}
+        onToggleTts={onToggleTts}
+        hasTtsAudio={hasTtsAudio}
       />
 
       {/* Click to play overlay (when paused) */}
