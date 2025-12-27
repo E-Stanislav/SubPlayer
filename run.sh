@@ -77,12 +77,9 @@ fi
 
 deactivate
 
-# Build if needed
-if [ ! -d "dist" ] || [ ! -d "dist-electron" ]; then
-    echo ""
-    echo "🔨 Сборка приложения..."
-    npx vite build 2>/dev/null
-fi
+echo ""
+echo "🔨 Сборка приложения..."
+npx vite build 2>/dev/null
 
 echo ""
 echo "🚀 Запуск SubPlayer..."
@@ -93,5 +90,5 @@ echo "  • Нажмите T во время просмотра для пере�
 echo "  • Субтитры появляются по мере обработки — можно смотреть сразу"
 echo ""
 
-# Run in dev mode (starts Electron automatically)
-npm run dev
+# Run in production mode (no dev tools, minimal logs)
+npx electron . 2>/dev/null

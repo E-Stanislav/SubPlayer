@@ -86,15 +86,12 @@ ipcMain.handle('open-file', async () => {
 ipcMain.handle('read-audio-file', async (event, filePath: string): Promise<string | null> => {
   try {
     if (!existsSync(filePath)) {
-      console.error('Audio file not found:', filePath)
       return null
     }
     const buffer = readFileSync(filePath)
-    console.log(`Read audio file: ${filePath}, size: ${buffer.length} bytes`)
     const base64 = buffer.toString('base64')
     return `data:audio/wav;base64,${base64}`
-  } catch (error) {
-    console.error('Failed to read audio file:', error)
+  } catch {
     return null
   }
 })
@@ -132,7 +129,6 @@ ipcMain.handle('process-video', async (event, videoPath: string, enableTts: bool
     return subtitles
 
   } catch (error) {
-    console.error('Error processing video:', error)
     mainWindow?.webContents.send('processing-update', {
       stage: 'error',
       progress: 0,

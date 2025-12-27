@@ -63,16 +63,9 @@ export default function VideoPlayer({
 
     // Load and play TTS audio through IPC
     const loadTts = async () => {
-      console.log('Loading TTS file:', audioFilePath)
-      
       const audioDataUrl = await window.electron?.readAudioFile(audioFilePath)
+      if (!audioDataUrl) return
       
-      if (!audioDataUrl) {
-        console.error('Failed to load TTS audio file')
-        return
-      }
-      
-      console.log('TTS audio loaded, data length:', audioDataUrl.length)
       setTtsAudioSrc(audioDataUrl)
       setPlayingTtsId(subtitleId)
     }
@@ -86,25 +79,18 @@ export default function VideoPlayer({
     if (!audio || !ttsAudioSrc) return
 
     const handleCanPlay = () => {
-      console.log('TTS audio ready, duration:', audio.duration, 'seconds')
-      
       // Lower video volume during TTS
       if (videoRef.current) {
         videoRef.current.volume = volume * 0.15
       }
-
-      audio.play()
-        .then(() => console.log('TTS playback started'))
-        .catch(err => {
-          console.error('TTS playback failed:', err)
-          if (videoRef.current) {
-            videoRef.current.volume = volume
-          }
-        })
+      audio.play().catch(() => {
+        if (videoRef.current) {
+          videoRef.current.volume = volume
+        }
+      })
     }
 
     const handleEnded = () => {
-      console.log('TTS playback ended')
       if (videoRef.current) {
         videoRef.current.volume = volume
       }
@@ -112,8 +98,7 @@ export default function VideoPlayer({
       setTtsAudioSrc(null)
     }
 
-    const handleError = (e: Event) => {
-      console.error('TTS audio error:', e, audio.error)
+    const handleError = () => {
       if (videoRef.current) {
         videoRef.current.volume = volume
       }

@@ -108,8 +108,8 @@ export class PythonBridge {
             try {
               const progressData = JSON.parse(line.substring(9))
               onProgress(progressData)
-            } catch (e) {
-              console.error('Failed to parse progress:', e)
+            } catch {
+              // Ignore parse errors
             }
           }
           // Streaming subtitles - send immediately to UI
@@ -120,8 +120,8 @@ export class PythonBridge {
               if (onSubtitle) {
                 onSubtitle(subtitle)
               }
-            } catch (e) {
-              console.error('Failed to parse subtitle:', e)
+            } catch {
+              // Ignore parse errors
             }
           }
         }
@@ -129,7 +129,6 @@ export class PythonBridge {
 
       pythonProcess.stderr?.on('data', (data: Buffer) => {
         errorBuffer += data.toString()
-        console.error('Python stderr:', data.toString())
       })
 
       pythonProcess.on('close', (code: number | null) => {
