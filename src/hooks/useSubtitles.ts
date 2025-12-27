@@ -13,7 +13,7 @@ export function useSubtitles() {
   const [isStreaming, setIsStreaming] = useState(false)
   const subtitlesRef = useRef<Subtitle[]>([])
 
-  const processVideo = useCallback(async (videoPath: string) => {
+  const processVideo = useCallback(async (videoPath: string, enableTts: boolean = false) => {
     if (!window.electron) {
       console.error('Electron API not available')
       setProcessingStatus({
@@ -49,17 +49,11 @@ export function useSubtitles() {
       setProcessingStatus({
         stage: 'extracting',
         progress: 0,
-        message: 'Подготовка к обработке...'
+        message: enableTts ? 'Подготовка (с озвучкой)...' : 'Подготовка...'
       })
 
-      // This will return when all subtitles are ready, but we're streaming them
-      await window.electron.processVideo(videoPath, (update) => {
-        setProcessingStatus({
-          stage: update.stage,
-          progress: update.progress,
-          message: update.message
-        })
-      })
+      // Process with TTS option
+      await window.electron.processVideo(videoPath, enableTts)
 
       setProcessingStatus({
         stage: 'done',

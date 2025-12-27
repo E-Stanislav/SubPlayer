@@ -3,11 +3,12 @@
 interface Window {
   electron: {
     openFile: () => Promise<string | null>
-    processVideo: (videoPath: string, onProgress: (status: ProcessingUpdate) => void) => Promise<SubtitleResult[]>
+    processVideo: (videoPath: string, enableTts?: boolean) => Promise<SubtitleResult[]>
     onProcessingUpdate: (callback: (update: ProcessingUpdate) => void) => void
     onSubtitleReady: (callback: (subtitle: SubtitleResult) => void) => void
     removeProcessingListener: () => void
     removeSubtitleListener: () => void
+    readAudioFile: (filePath: string) => Promise<string | null>
   }
 }
 
@@ -23,4 +24,5 @@ interface SubtitleResult {
   end: number
   text: string
   translatedText: string
+  audioFile?: string | null
 }

@@ -11,6 +11,7 @@ interface Subtitle {
   end: number
   text: string
   translatedText: string
+  audioFile?: string | null
 }
 
 interface ProgressCallback {
@@ -19,6 +20,10 @@ interface ProgressCallback {
 
 interface SubtitleCallback {
   (subtitle: Subtitle): void
+}
+
+interface ProcessOptions {
+  enableTts?: boolean
 }
 
 export class PythonBridge {
@@ -65,7 +70,8 @@ export class PythonBridge {
   async processVideo(
     videoPath: string, 
     onProgress: ProgressCallback,
-    onSubtitle?: SubtitleCallback
+    onSubtitle?: SubtitleCallback,
+    options?: ProcessOptions
   ): Promise<Subtitle[]> {
     const scriptPath = join(this.pythonPath, 'process.py')
     
@@ -74,11 +80,14 @@ export class PythonBridge {
       throw new Error(`Python script not found: ${scriptPath}`)
     }
 
+    // Build command args
+    const args = [scriptPath, videoPath]
+    if (options?.enableTts) {
+      args.push('--tts')
+    }
+
     return new Promise((resolve, reject) => {
-      const pythonProcess: ChildProcess = spawn(this.pythonExecutable, [
-        scriptPath,
-        videoPath
-      ], {
+      const pythonProcess: ChildProcess = spawn(this.pythonExecutable, args, {
         cwd: this.pythonPath,
         env: { ...nodeEnv, PYTHONUNBUFFERED: '1' }
       })
@@ -125,7 +134,7 @@ export class PythonBridge {
 
       pythonProcess.on('close', (code: number | null) => {
         if (code === 0) {
-          // Return collected subtitles (also available from RESULT for backwards compat)
+          // Return collected subtitles
           if (subtitles.length > 0) {
             resolve(subtitles)
           } else {

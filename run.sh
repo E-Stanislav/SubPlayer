@@ -56,8 +56,10 @@ if [ ! -d "python/venv" ]; then
     python3 -m venv python/venv
 fi
 
-# Check if Python packages are installed
+# Activate venv and check packages
 source python/venv/bin/activate
+
+# Check if base packages are installed
 if ! python -c "import faster_whisper" 2>/dev/null; then
     echo ""
     echo "📦 Установка Python зависимостей..."
@@ -65,38 +67,31 @@ if ! python -c "import faster_whisper" 2>/dev/null; then
 else
     echo -e "${GREEN}✓${NC} Python зависимости установлены"
 fi
+
+# Check if TTS is installed (optional)
+if python -c "import torch; torch.hub.list('snakers4/silero-models')" 2>/dev/null; then
+    echo -e "${GREEN}✓${NC} Silero TTS доступен"
+else
+    echo -e "${YELLOW}⚠${NC} Silero TTS будет загружен при первом использовании (~100 МБ)"
+fi
+
 deactivate
 
 # Build if needed
 if [ ! -d "dist" ] || [ ! -d "dist-electron" ]; then
     echo ""
     echo "🔨 Сборка приложения..."
-    npm run build 2>/dev/null || {
-        # If build script doesn't exist, use vite directly
-        npx vite build
-    }
-fi
-
-# Check if app exists
-APP_PATH="release/mac-arm64/SubPlayer.app"
-if [ ! -d "$APP_PATH" ]; then
-    echo ""
-    echo "📦 Сборка Electron приложения..."
-    npm run electron:build 2>/dev/null || {
-        npx vite build && npx electron-builder --mac --arm64
-    }
+    npx vite build 2>/dev/null
 fi
 
 echo ""
 echo "🚀 Запуск SubPlayer..."
 echo ""
+echo "Подсказки:"
+echo "  • Включите 'Озвучка на русском' перед загрузкой видео для TTS"
+echo "  • Нажмите T во время просмотра для переключения озвучки"
+echo "  • Субтитры появляются по мере обработки — можно смотреть сразу"
+echo ""
 
-# Run the app
-if [ -d "$APP_PATH" ]; then
-    open "$APP_PATH"
-else
-    # Fallback: run in dev mode
-    echo "Запуск в режиме разработки..."
-    npm run dev
-fi
-
+# Run in dev mode (starts Electron automatically)
+npm run dev

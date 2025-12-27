@@ -13,6 +13,7 @@ interface SubtitleResult {
   end: number
   text: string
   translatedText: string
+  audioFile?: string | null
 }
 
 // Expose protected methods to renderer process
@@ -22,12 +23,17 @@ contextBridge.exposeInMainWorld('electron', {
     return ipcRenderer.invoke('open-file')
   },
 
-  // Process video (transcribe + translate) with streaming support
+  // Process video (transcribe + translate + optional TTS)
   processVideo: (
     videoPath: string, 
-    _onProgress: (update: ProcessingUpdate) => void
+    enableTts: boolean = false
   ): Promise<SubtitleResult[]> => {
-    return ipcRenderer.invoke('process-video', videoPath)
+    return ipcRenderer.invoke('process-video', videoPath, enableTts)
+  },
+
+  // Read audio file as base64 data URL (via IPC to main process)
+  readAudioFile: (filePath: string): Promise<string | null> => {
+    return ipcRenderer.invoke('read-audio-file', filePath)
   },
 
   // Listen for processing updates

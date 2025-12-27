@@ -14,6 +14,9 @@ interface ControlsProps {
   onToggleMute: () => void
   onToggleFullscreen: () => void
   onReset: () => void
+  ttsEnabled?: boolean
+  onToggleTts?: () => void
+  hasTtsAudio?: boolean
 }
 
 export default function Controls({
@@ -29,7 +32,10 @@ export default function Controls({
   onVolumeChange,
   onToggleMute,
   onToggleFullscreen,
-  onReset
+  onReset,
+  ttsEnabled = false,
+  onToggleTts,
+  hasTtsAudio = false
 }: ControlsProps) {
   const progressRef = useRef<HTMLDivElement>(null)
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
@@ -81,7 +87,7 @@ export default function Controls({
         {/* Background track */}
         <div className="absolute inset-0 bg-white/20 rounded-full" />
         
-        {/* Buffered indicator (placeholder) */}
+        {/* Buffered indicator */}
         <div 
           className="absolute inset-y-0 left-0 bg-white/30 rounded-full"
           style={{ width: `${Math.min(progress + 10, 100)}%` }}
@@ -225,11 +231,30 @@ export default function Controls({
 
         {/* Right controls */}
         <div className="flex items-center gap-2">
+          {/* TTS Toggle */}
+          {hasTtsAudio && onToggleTts && (
+            <button
+              onClick={onToggleTts}
+              className={`
+                p-2 rounded-full transition-colors no-drag
+                ${ttsEnabled 
+                  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' 
+                  : 'hover:bg-white/10 text-white/60'
+                }
+              `}
+              title={ttsEnabled ? 'Выключить озвучку (T)' : 'Включить озвучку (T)'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </button>
+          )}
+
           {/* Fullscreen */}
           <button
             onClick={onToggleFullscreen}
             className="p-2 rounded-full hover:bg-white/10 transition-colors no-drag"
-            title="Полный экран"
+            title="Полный экран (F)"
           >
             {isFullscreen ? (
               <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,4 +271,3 @@ export default function Controls({
     </div>
   )
 }
-
