@@ -1,23 +1,30 @@
+# Dependencies
 node_modules/
-dist/
-.DS_Store
-*.log
-.env
+python/venv/
+python/__pycache__/
+python/models/
 
-# Build artifacts
-*.dmg
-*.exe
-*.AppImage
-*.deb
-*.rpm
-*.snap
+# Build outputs
+dist/
+dist-electron/
+release/
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
+.DS_Store
 
-# OS files
-Thumbs.db
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+
