@@ -40,6 +40,7 @@ export default function VideoPlayer({
   const [showSubtitles, setShowSubtitles] = useState(true)
   const [showTranslation, setShowTranslation] = useState(true)
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null)
+  const lastPlayedSubtitleIdRef = useRef<number | null>(null)
 
   // Find current subtitle based on video time
   useEffect(() => {
@@ -55,8 +56,8 @@ export default function VideoPlayer({
       return
     }
 
-    // Don't replay if same subtitle
-    if (playingTtsId === currentSubtitle.id) {
+    // Don't replay unless we seek or move to a new subtitle
+    if (lastPlayedSubtitleIdRef.current === currentSubtitle.id) {
       return
     }
 
@@ -70,6 +71,7 @@ export default function VideoPlayer({
       
       setTtsAudioSrc(audioDataUrl)
       setPlayingTtsId(subtitleId)
+      lastPlayedSubtitleIdRef.current = subtitleId
     }
 
     loadTts()
@@ -132,6 +134,7 @@ export default function VideoPlayer({
       ttsAudioRef.current.pause()
       setTtsAudioSrc(null)
       setPlayingTtsId(null)
+      lastPlayedSubtitleIdRef.current = null
       // Restore video volume
       if (videoRef.current) {
         videoRef.current.volume = volume
@@ -202,6 +205,7 @@ export default function VideoPlayer({
         setTtsAudioSrc(null)
         setPlayingTtsId(null)
       }
+      lastPlayedSubtitleIdRef.current = null
     }
   }, [ttsAudioSrc])
 
