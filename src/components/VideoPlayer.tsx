@@ -40,6 +40,7 @@ export default function VideoPlayer({
   const [showSubtitles, setShowSubtitles] = useState(true)
   const [showTranslation, setShowTranslation] = useState(true)
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null)
+  const lastPlayedSubtitleIdRef = useRef<number | null>(null)
 
   // Find current subtitle based on video time
   useEffect(() => {
@@ -51,12 +52,12 @@ export default function VideoPlayer({
 
   // Play TTS audio when subtitle changes (if TTS enabled)
   useEffect(() => {
-    if (!ttsEnabled || !currentSubtitle?.audioFile) {
+    if (!ttsEnabled || !currentSubtitle?.audioFile || !isPlaying) {
       return
     }
 
-    // Don't replay if same subtitle
-    if (playingTtsId === currentSubtitle.id) {
+    // Don't replay unless we seek or move to a new subtitle
+    if (lastPlayedSubtitleIdRef.current === currentSubtitle.id) {
       return
     }
 
@@ -70,10 +71,11 @@ export default function VideoPlayer({
       
       setTtsAudioSrc(audioDataUrl)
       setPlayingTtsId(subtitleId)
+      lastPlayedSubtitleIdRef.current = subtitleId
     }
 
     loadTts()
-  }, [currentSubtitle, ttsEnabled, playingTtsId])
+  }, [currentSubtitle, ttsEnabled, playingTtsId, isPlaying])
 
   // Handle TTS audio element events
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function VideoPlayer({
       ttsAudioRef.current.pause()
       setTtsAudioSrc(null)
       setPlayingTtsId(null)
+      lastPlayedSubtitleIdRef.current = null
       // Restore video volume
       if (videoRef.current) {
         videoRef.current.volume = volume
@@ -174,12 +177,32 @@ export default function VideoPlayer({
     }
   }, [])
 
-  const handlePlay = useCallback(() => setIsPlaying(true), [])
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true)
+    const audio = ttsAudioRef.current
+    if (!ttsEnabled || !audio || !ttsAudioSrc || !currentSubtitle) {
+      return
+    }
+    if (lastPlayedSubtitleIdRef.current !== currentSubtitle.id || !audio.paused) {
+      return
+    }
+    if (videoRef.current) {
+      videoRef.current.volume = volume * 0.15
+    }
+    audio.play().catch(() => {
+      if (videoRef.current) {
+        videoRef.current.volume = volume
+      }
+    })
+  }, [ttsEnabled, ttsAudioSrc, currentSubtitle, volume])
   const handlePause = useCallback(() => {
     setIsPlaying(false)
     // Pause TTS too
     ttsAudioRef.current?.pause()
-  }, [])
+    if (videoRef.current) {
+      videoRef.current.volume = volume
+    }
+  }, [volume])
 
   // Control functions
   const togglePlay = useCallback(() => {
@@ -202,6 +225,7 @@ export default function VideoPlayer({
         setTtsAudioSrc(null)
         setPlayingTtsId(null)
       }
+      lastPlayedSubtitleIdRef.current = null
     }
   }, [ttsAudioSrc])
 
